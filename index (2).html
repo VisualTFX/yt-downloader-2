@@ -1,0 +1,1715 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>One4AllDownloader</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-functions-compat.js"></script>
+
+    <!-- FingerprintJS -->
+    <script src="https://cdn.jsdelivr.net/npm/@fingerprintjs/fingerprintjs@3/dist/fp.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    animation: {
+                        'blob': 'blob 10s infinite alternate',
+                        'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                    },
+                    keyframes: {
+                        blob: {
+                            '0%': { transform: 'translate(0px, 0px) scale(1)' },
+                            '33%': { transform: 'translate(30px, -50px) scale(1.1)' },
+                            '66%': { transform: 'translate(-20px, 20px) scale(0.9)' },
+                            '100%': { transform: 'translate(0px, 0px) scale(1)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            transition: background 1s ease-in-out;
+            background-size: 400% 400%;
+            animation: gradientBG 20s ease-in-out infinite;
+            /* Allow scrolling on mobile if content is tall */
+            overflow-x: hidden; 
+            overflow-y: auto;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* Default Cursor (Touch/Mobile) */
+        body { cursor: auto; }
+        
+        /* Custom Cursor Elements - Hidden by default (Mobile) */
+        .cursor-outer, .cursor-inner { display: none; }
+
+        /* Desktop specific styles */
+        @media (min-width: 1024px) {
+            body { cursor: none; overflow: hidden; } /* Lock scroll on large desktop screens for app-feel */
+            .cursor-outer, .cursor-inner { display: block; }
+        }
+
+        /* Custom Cursor Styles */
+        .cursor-outer {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 45px;
+            height: 45px;
+            border: 2px solid rgba(255, 255, 255, 0.85);
+            background-color: rgba(255, 255, 255, 0.03); 
+            border-radius: 50%;
+            pointer-events: none;
+            transform: translate(-50%, -50%);
+            z-index: 9999;
+            transition: width 0.3s, height 0.3s, background-color 0.3s, border-color 0.3s, opacity 0.3s, box-shadow 0.3s;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.2); 
+        }
+
+        .cursor-inner {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            pointer-events: none;
+            transform: translate(-50%, -50%);
+            z-index: 9999;
+            transition: width 0.3s, height 0.3s, border-width 0.3s;
+            border: 2px solid rgba(255, 255, 255, 0.9);
+            box-shadow: 0 0 15px rgba(255, 255, 255, 0.5);
+        }
+
+        /* Hover State for Cursor */
+        body.hovering .cursor-outer {
+            width: 65px;
+            height: 65px;
+            border-color: rgba(255, 255, 255, 1);
+            background-color: rgba(255, 255, 255, 0.1);
+            box-shadow: 0 0 25px rgba(255, 255, 255, 0.3);
+        }
+        
+        body.hovering .cursor-inner {
+            width: 8px;
+            height: 8px;
+            border-width: 0px; 
+        }
+
+        @keyframes gradientBG {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+            transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94), box-shadow 0.4s ease;
+        }
+
+        /* Dropdown specific glass style */
+        .glass-dropdown-menu {
+            background: rgba(0, 0, 0, 0.8); /* Darker/More Opaque for mobile readability */
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3);
+        }
+
+        .glass-input {
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: white;
+            transition: all 0.3s ease-out;
+            cursor: auto; /* Default cursor on inputs */
+        }
+        @media (min-width: 1024px) {
+            .glass-input { cursor: none; }
+        }
+
+        .glass-input:focus {
+            outline: none;
+            background: rgba(0, 0, 0, 0.3);
+            border-color: rgba(255, 255, 255, 0.4);
+            box-shadow: 0 0 15px rgba(255,255,255,0.1);
+        }
+
+        .glass-button {
+            background: linear-gradient(135deg, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0.05) 100%);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+        }
+        @media (min-width: 1024px) {
+            .glass-button { cursor: none; }
+        }
+
+        .glass-button:hover {
+            background: linear-gradient(135deg, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0.1) 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        }
+        .glass-button:active {
+            transform: translateY(0);
+        }
+        .glass-button.active {
+            background: rgba(255, 255, 255, 0.9);
+            color: #1a1a1a;
+            box-shadow: 0 0 20px rgba(255,255,255,0.3);
+        }
+        
+        /* Blur Utility for API Lock */
+        .blur-lock {
+            filter: blur(8px);
+            pointer-events: none;
+            user-select: none;
+        }
+
+        #progressBar { transition: none; }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.4); }
+        
+        /* Interactive elements cursor fix */
+        a, button, select, input, .interactable { cursor: pointer; }
+        @media (min-width: 1024px) {
+            a, button, select, input, .interactable { cursor: none !important; }
+        }
+        
+        /* Code block styling */
+        pre {
+            background: rgba(0,0,0,0.3);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 0.5rem;
+            padding: 1rem;
+            overflow-x: auto;
+        }
+        code {
+            font-family: 'Fira Code', monospace;
+            font-size: 0.85em;
+            color: #e2e8f0;
+        }
+    </style>
+</head>
+<body class="min-h-[100dvh] text-white font-sans relative" id="mainBody">
+
+    <!-- Custom Cursor Elements -->
+    <div id="cursor-outer" class="cursor-outer opacity-0"></div>
+    <div id="cursor-inner" class="cursor-inner opacity-0"></div>
+
+    <!-- WRAPPER FOR CONTENT THAT SHOULD BE BLURRED -->
+    <div id="blur-container" class="w-full min-h-[100dvh] flex items-center justify-center p-4 transition-all duration-500 overflow-x-hidden">
+        <!-- Background Orbs -->
+        <div class="fixed top-0 left-0 w-full h-full overflow-hidden -z-10 pointer-events-none">
+            <div class="absolute top-0 left-1/4 w-96 h-96 bg-purple-500 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob"></div>
+            <div class="absolute top-0 right-1/4 w-96 h-96 bg-yellow-500 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-2000"></div>
+            <div class="absolute -bottom-32 left-1/3 w-96 h-96 bg-pink-500 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-4000"></div>
+        </div>
+
+        <!-- Main Container -->
+        <main class="w-full max-w-2xl z-10 py-6 md:py-0">
+            
+            <!-- Header -->
+            <div class="text-center mb-8 relative flex flex-col md:block">
+                <h1 class="text-4xl md:text-5xl font-bold tracking-tight mb-2 drop-shadow-lg text-black transition-transform duration-700 hover:scale-[1.02]">
+                    One4All<span class="text-transparent bg-clip-text bg-gradient-to-r from-pink-300 to-purple-300">Downloader</span>
+                </h1>
+                <p class="text-white/70 text-sm md:text-base font-light">Paste a link, choose your format, and enjoy.</p>
+
+                <!-- Top Right Action Buttons (Responsive Layout) -->
+                <div class="flex justify-center gap-4 mt-6 mb-2 md:absolute md:top-0 md:-right-16 md:flex-col md:mt-0 md:mb-0 md:gap-3 z-20">
+                    
+                    <!-- API Trigger -->
+                    <button onclick="toggleApi()" class="p-3 rounded-full glass-panel hover:bg-white/20 transition-all duration-500 group interactable relative shadow-lg active:scale-95" title="Developer API">
+                        <i class="fa-solid fa-code text-white md:group-hover:scale-110 transition-transform duration-300"></i>
+                    </button>
+
+                    <!-- User Profile Trigger -->
+                    <button onclick="toggleAuth()" class="p-3 rounded-full glass-panel hover:bg-white/20 transition-all duration-500 group interactable relative shadow-lg active:scale-95" id="userBtn" title="Account">
+                        <i class="fa-solid fa-user text-white md:group-hover:scale-110 transition-transform duration-300"></i>
+                        <!-- Login Status Dot -->
+                        <span id="userStatusDot" class="absolute top-0 right-0 w-3 h-3 bg-red-400 rounded-full border-2 border-transparent shadow-[0_0_10px_rgba(248,113,113,0.8)]"></span>
+                    </button>
+
+                    <!-- Settings Trigger -->
+                    <button onclick="toggleSettings()" class="p-3 rounded-full glass-panel hover:bg-white/20 transition-all duration-500 group interactable shadow-lg active:scale-95" title="Theme Settings">
+                        <i class="fa-solid fa-paintbrush text-white md:group-hover:rotate-180 transition-transform duration-700 ease-out"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Main Card -->
+            <div class="glass-panel rounded-2xl p-5 md:p-8 relative hover:shadow-[0_8px_32px_rgba(255,255,255,0.1)] transition-shadow duration-500">
+                
+                <!-- Type Toggle -->
+                <div class="relative flex justify-center mb-8 bg-black/20 rounded-full p-1 w-full max-w-xs mx-auto backdrop-blur-md shadow-inner border border-white/5">
+                    <!-- Liquid Slider Background -->
+                    <div id="modeSlider" class="absolute top-1 left-1 w-[calc(50%-4px)] h-[calc(100%-8px)] rounded-full bg-gradient-to-b from-white/20 to-white/5 backdrop-blur-xl border border-white/10 shadow-[0_0_15px_rgba(255,255,255,0.1)] transition-transform duration-500 cubic-bezier(0.34, 1.56, 0.64, 1) z-0"></div>
+
+                    <!-- Buttons -->
+                    <button onclick="setMode('video')" id="btn-video" class="relative z-10 w-1/2 py-3 rounded-full text-sm font-bold text-white transition-all duration-500 interactable flex items-center justify-center gap-2 group active:scale-95">
+                        <i class="fa-solid fa-video md:group-hover:scale-110 transition-transform duration-300"></i> Video
+                    </button>
+                    <button onclick="setMode('audio')" id="btn-audio" class="relative z-10 w-1/2 py-3 rounded-full text-sm font-medium text-white/50 transition-all duration-500 interactable flex items-center justify-center gap-2 group active:scale-95">
+                        <i class="fa-solid fa-music md:group-hover:scale-110 transition-transform duration-300"></i> Audio
+                    </button>
+                </div>
+
+                <!-- URL Input -->
+                <div class="mb-6 group">
+                    <label class="block text-xs uppercase tracking-wider text-white/60 mb-2 font-semibold ml-1">YouTube URL</label>
+                    <div class="relative transform transition-transform duration-300 group-focus-within:scale-[1.01]">
+                        <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                            <i class="fa-brands fa-youtube text-red-500 text-xl group-focus-within:text-red-400 transition-colors duration-300"></i>
+                        </div>
+                        <input type="text" id="urlInput" placeholder="https://www.youtube.com/watch?v=..." 
+                            class="w-full pl-12 pr-4 py-4 rounded-xl glass-input placeholder-white/30 text-lg border-transparent focus:border-white/30 interactable">
+                    </div>
+                </div>
+
+                <!-- Options Grid -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+                    <!-- Custom Format Selector -->
+                    <div class="relative z-30">
+                        <label class="block text-xs uppercase tracking-wider text-white/60 mb-2 font-semibold ml-1">Format</label>
+                        <div class="relative" id="formatDropdown">
+                            <button id="formatTrigger" class="w-full pl-4 pr-10 py-3 rounded-xl glass-input text-left flex items-center justify-between group hover:bg-white/10 transition-colors interactable active:scale-[0.99]" onclick="toggleCustomDropdown('format')">
+                                <span id="formatSelectedText">Select Format</span>
+                                <i class="fa-solid fa-chevron-down text-xs text-white/60 transition-transform duration-300 group-hover:translate-y-0.5" id="formatIcon"></i>
+                            </button>
+                            
+                            <!-- Custom Options List -->
+                            <div id="formatOptions" class="absolute top-full left-0 w-full mt-2 rounded-xl glass-dropdown-menu hidden overflow-hidden max-h-60 overflow-y-auto transform transition-all duration-200 origin-top opacity-0 scale-95 z-40">
+                                <!-- Populated by JS -->
+                            </div>
+                        </div>
+                        <input type="hidden" id="formatSelect">
+                    </div>
+
+                    <!-- Custom Quality Selector -->
+                    <div class="relative z-20">
+                        <label class="block text-xs uppercase tracking-wider text-white/60 mb-2 font-semibold ml-1">Quality</label>
+                        <div class="relative" id="qualityDropdown">
+                            <button id="qualityTrigger" class="w-full pl-4 pr-10 py-3 rounded-xl glass-input text-left flex items-center justify-between group hover:bg-white/10 transition-colors interactable active:scale-[0.99]" onclick="toggleCustomDropdown('quality')">
+                                <span id="qualitySelectedText">Select Quality</span>
+                                <i class="fa-solid fa-chevron-down text-xs text-white/60 transition-transform duration-300 group-hover:translate-y-0.5" id="qualityIcon"></i>
+                            </button>
+
+                            <!-- Custom Options List -->
+                            <div id="qualityOptions" class="absolute top-full left-0 w-full mt-2 rounded-xl glass-dropdown-menu hidden overflow-hidden max-h-60 overflow-y-auto transform transition-all duration-200 origin-top opacity-0 scale-95 z-40">
+                                <!-- Populated by JS -->
+                            </div>
+                        </div>
+                        <input type="hidden" id="qualitySelect">
+                    </div>
+                </div>
+
+                <!-- Action Area -->
+                <div class="relative z-10">
+                    <button onclick="startDownload()" id="downloadBtn" class="w-full py-4 rounded-xl bg-white text-black font-bold text-lg hover:bg-opacity-90 transition-all shadow-lg hover:shadow-white/20 transform md:hover:-translate-y-1 active:scale-95 flex items-center justify-center gap-2 overflow-hidden relative interactable">
+                        <span class="relative z-10 flex items-center gap-2" id="btnContent">
+                            <span>Download</span>
+                            <i class="fa-solid fa-download"></i>
+                        </span>
+                        <!-- Shine Effect -->
+                        <div class="absolute top-0 -left-[100%] w-full h-full bg-gradient-to-r from-transparent via-white/50 to-transparent skew-x-12 hover:animate-[shine_1s_ease-in-out]"></div>
+                    </button>
+
+                    <!-- Progress Bar Container (Hidden by default) -->
+                    <div id="progressContainer" class="hidden mt-6 transition-all duration-500 opacity-0 transform translate-y-4">
+                        <div class="flex justify-between text-xs font-semibold uppercase tracking-wider mb-2 text-white/80">
+                            <span id="progressStatus" class="transition-opacity duration-300">Connecting...</span>
+                            <span id="progressPercent" class="font-mono">0%</span>
+                        </div>
+                        <div class="h-2 w-full bg-black/30 rounded-full overflow-hidden backdrop-blur-sm">
+                            <div id="progressBar" class="h-full bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 w-0 rounded-full shadow-[0_0_15px_rgba(236,72,153,0.6)]"></div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Footer Info -->
+            <p class="text-center mt-6 text-white/30 text-xs mb-8 md:mb-0">
+                &copy; 2026 One4AllDownloader. Powered by Firebase.
+            </p>
+
+        </main>
+    </div>
+
+    <!-- Settings Overlay -->
+    <div id="settingsOverlay" class="fixed inset-0 bg-black/60 backdrop-blur-md z-50 hidden opacity-0 transition-all duration-500 flex items-center justify-center p-4">
+        <!-- ... existing settings content ... -->
+        <div class="glass-panel w-full max-w-md rounded-2xl p-6 transform scale-90 transition-all duration-500 cubic-bezier(0.34, 1.56, 0.64, 1) max-h-[90vh] overflow-y-auto" id="settingsPanel">
+            
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-xl font-bold flex items-center gap-2">
+                    <i class="fa-solid fa-palette text-pink-400"></i> Theme Builder
+                </h2>
+                <button onclick="toggleSettings()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors duration-300 interactable">
+                    <i class="fa-solid fa-times"></i>
+                </button>
+            </div>
+
+            <p class="text-sm text-white/70 mb-4">
+                Customize your gradient. Add between 2 and 5 colors. Preferences are saved automatically.
+            </p>
+
+            <!-- Color List -->
+            <div id="colorList" class="space-y-3 mb-6 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
+                <!-- Color inputs injected here -->
+            </div>
+
+            <!-- Add/Reset Controls -->
+            <div class="flex gap-3 mb-6">
+                <button onclick="addColorStop()" id="btnAddColor" class="flex-1 py-2 rounded-lg bg-white/10 hover:bg-white/20 border border-white/10 text-sm font-medium transition-all duration-300 active:scale-95 interactable">
+                    <i class="fa-solid fa-plus mr-1"></i> Add Color
+                </button>
+                <button onclick="resetTheme()" class="px-4 py-2 rounded-lg bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 text-red-200 text-sm font-medium transition-all duration-300 active:scale-95 interactable">
+                    Reset
+                </button>
+            </div>
+
+            <!-- Preview Strip -->
+            <div class="mb-2 text-xs uppercase tracking-wider text-white/50 font-semibold">Live Preview</div>
+            <div id="previewStrip" class="h-12 w-full rounded-lg shadow-inner border border-white/10 mb-6 transition-all duration-500"></div>
+
+            <button onclick="saveAndCloseSettings()" class="w-full py-3 rounded-xl bg-gradient-to-r from-pink-500 to-purple-600 font-bold hover:shadow-lg hover:shadow-purple-500/25 transition-all duration-300 transform md:hover:-translate-y-1 active:scale-95 interactable">
+                Save Theme
+            </button>
+
+        </div>
+    </div>
+
+    <!-- Auth Overlay (Login/Signup) -->
+    <div id="authOverlay" class="fixed inset-0 bg-black/60 backdrop-blur-md z-50 hidden opacity-0 transition-all duration-500 flex items-center justify-center p-4">
+        <div class="glass-panel w-full max-w-sm rounded-2xl p-8 transform scale-90 transition-all duration-500 cubic-bezier(0.34, 1.56, 0.64, 1) max-h-[90vh] overflow-y-auto" id="authPanel">
+            
+            <div class="flex justify-end mb-2">
+                <button onclick="toggleAuth()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors duration-300 interactable">
+                    <i class="fa-solid fa-times"></i>
+                </button>
+            </div>
+
+            <!-- Profile Info (Visible if logged in) -->
+            <div id="profileView" class="hidden text-center">
+                <div class="w-20 h-20 bg-gradient-to-tr from-pink-500 to-purple-600 rounded-full mx-auto mb-4 flex items-center justify-center shadow-lg border-2 border-white/20">
+                    <i class="fa-solid fa-user text-3xl text-white"></i>
+                </div>
+                <h3 class="text-xl font-bold mb-1">Welcome Back!</h3>
+                <p class="text-white/60 text-sm mb-6" id="userEmailDisplay">user@example.com</p>
+                <button onclick="handleLogout()" class="w-full py-3 rounded-xl bg-white/10 border border-white/10 hover:bg-red-500/20 hover:border-red-500/50 hover:text-red-200 transition-all duration-300 interactable">
+                    Sign Out
+                </button>
+            </div>
+
+            <!-- Auth Form (Visible if guest) -->
+            <div id="authFormView">
+                <div class="text-center mb-6">
+                    <h2 class="text-2xl font-bold mb-1" id="authTitle">Sign In</h2>
+                    <p class="text-white/50 text-sm">Save your preferences across devices.</p>
+                </div>
+
+                <!-- Liquid Auth Toggle -->
+                <div class="relative flex justify-center mb-6 bg-black/20 rounded-full p-1 w-full backdrop-blur-md shadow-inner border border-white/5">
+                    <div id="authToggleSlider" class="absolute top-1 left-1 w-[calc(50%-4px)] h-[calc(100%-8px)] rounded-full bg-gradient-to-b from-white/20 to-white/5 backdrop-blur-xl border border-white/10 shadow-[0_0_15px_rgba(255,255,255,0.1)] transition-transform duration-500 cubic-bezier(0.34, 1.56, 0.64, 1) z-0"></div>
+                    <button onclick="switchAuthMode(true)" id="btn-login" class="relative z-10 w-1/2 py-2 rounded-full text-xs font-bold text-white transition-all duration-500 interactable">
+                        Sign In
+                    </button>
+                    <button onclick="switchAuthMode(false)" id="btn-signup" class="relative z-10 w-1/2 py-2 rounded-full text-xs font-medium text-white/50 transition-all duration-500 interactable">
+                        Sign Up
+                    </button>
+                </div>
+
+                <!-- Inputs -->
+                <div class="space-y-4 mb-6">
+                    <div class="relative group">
+                        <i class="fa-solid fa-envelope absolute left-4 top-1/2 transform -translate-y-1/2 text-white/40 group-focus-within:text-pink-400 transition-colors"></i>
+                        <input type="email" id="authEmail" placeholder="Email Address" class="w-full pl-10 pr-4 py-3 rounded-xl glass-input text-sm focus:border-pink-400/50 interactable">
+                    </div>
+                    
+                    <!-- Password Field -->
+                    <div class="relative group">
+                        <i class="fa-solid fa-lock absolute left-4 top-1/2 transform -translate-y-1/2 text-white/40 group-focus-within:text-purple-400 transition-colors"></i>
+                        <input type="password" id="authPass" placeholder="Password" class="w-full pl-10 pr-4 py-3 rounded-xl glass-input text-sm focus:border-purple-400/50 interactable" onkeyup="checkPasswordStrength(this.value)">
+                    </div>
+
+                    <!-- Password Strength Meter (Hidden by default, shown on typing) -->
+                    <div id="passwordStrengthContainer" class="hidden transition-all duration-300">
+                        <div class="flex justify-between text-[10px] uppercase tracking-wider text-white/50 mb-1 font-semibold">
+                            <span>Password Strength</span>
+                            <span id="passwordStrengthText">Weak</span>
+                        </div>
+                        <div class="h-1.5 w-full bg-black/30 rounded-full overflow-hidden">
+                            <div id="passwordStrengthBar" class="h-full w-0 transition-all duration-500 bg-red-500"></div>
+                        </div>
+                        <p class="text-[10px] text-white/40 mt-1 leading-tight">
+                            Requires 8+ chars, uppercase, lowercase, number & special char.
+                        </p>
+                    </div>
+
+                    <!-- Confirm Password Field (Hidden in Login) -->
+                    <div class="relative group hidden" id="confirmPassContainer">
+                        <i class="fa-solid fa-check-double absolute left-4 top-1/2 transform -translate-y-1/2 text-white/40 group-focus-within:text-purple-400 transition-colors"></i>
+                        <input type="password" id="authConfirmPass" placeholder="Confirm Password" class="w-full pl-10 pr-4 py-3 rounded-xl glass-input text-sm focus:border-purple-400/50 interactable">
+                    </div>
+                </div>
+
+                <button onclick="handleAuthSubmit()" class="w-full py-3 rounded-xl bg-gradient-to-r from-pink-500 to-purple-600 font-bold hover:shadow-lg hover:shadow-purple-500/25 transition-all duration-300 transform md:hover:-translate-y-1 active:scale-95 interactable flex justify-center items-center gap-2" id="authSubmitBtn">
+                    <span id="authSubmitText">Sign In</span>
+                    <i class="fa-solid fa-arrow-right"></i>
+                </button>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- API Overlay -->
+    <div id="apiOverlay" class="fixed inset-0 bg-black/60 backdrop-blur-md z-50 hidden opacity-0 transition-all duration-500 flex items-center justify-center p-4">
+        <!-- ... existing API panel content ... -->
+        <div class="glass-panel w-full max-w-2xl rounded-2xl p-0 overflow-hidden transform scale-90 transition-all duration-500 cubic-bezier(0.34, 1.56, 0.64, 1) relative h-[85vh] md:h-auto flex flex-col" id="apiPanel">
+            
+            <!-- Content Wrapper for Blurring -->
+            <div id="apiBlurTarget" class="h-full flex flex-col transition-all duration-500 blur-lock">
+                <!-- Header -->
+                <div class="p-6 border-b border-white/10 flex justify-between items-center relative z-20 bg-white/5 backdrop-blur-xl shrink-0">
+                    <h2 class="text-xl font-bold flex items-center gap-2">
+                        <i class="fa-solid fa-terminal text-green-400"></i> Developer API
+                    </h2>
+                    <button onclick="toggleApi()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors duration-300 interactable">
+                        <i class="fa-solid fa-times"></i>
+                    </button>
+                </div>
+
+                <!-- Content Area (Scrollable) -->
+                <div class="p-6 overflow-y-auto custom-scrollbar relative grow" id="apiContentArea">
+                    
+                    <!-- API Key Section -->
+                    <div class="mb-8">
+                        <h3 class="text-sm font-semibold uppercase tracking-wider text-white/50 mb-4">Authentication</h3>
+                        <div class="bg-black/30 rounded-xl p-4 border border-white/5">
+                            <label class="block text-xs text-white/60 mb-2">Your API Key</label>
+                            <div class="flex gap-2">
+                                <div class="relative flex-1">
+                                    <input type="text" id="apiKeyDisplay" value="********************************" readonly class="w-full bg-black/20 border border-white/10 rounded-lg py-2 px-3 font-mono text-sm text-green-400 tracking-wide focus:outline-none">
+                                </div>
+                                <button onclick="copyApiKey()" class="p-2 rounded-lg bg-white/10 hover:bg-white/20 text-white/80 transition-colors interactable" title="Copy Key">
+                                    <i class="fa-regular fa-copy"></i>
+                                </button>
+                                <button onclick="generateUniqueKey()" class="p-2 rounded-lg bg-white/10 hover:bg-white/20 text-white/80 transition-colors interactable" title="Generate New Key">
+                                    <i class="fa-solid fa-rotate"></i>
+                                </button>
+                            </div>
+                            <p class="text-xs text-white/40 mt-2">
+                                <i class="fa-solid fa-circle-info mr-1"></i> Keys are unique and cannot be reused if regenerated.
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Documentation -->
+                    <div class="space-y-6">
+                        <h3 class="text-sm font-semibold uppercase tracking-wider text-white/50 mb-4">Documentation</h3>
+
+                        <!-- Endpoint -->
+                        <div>
+                            <div class="flex items-center gap-2 mb-2">
+                                <span class="px-2 py-1 rounded bg-blue-500/20 text-blue-300 text-xs font-bold border border-blue-500/30">POST</span>
+                                <code class="text-sm">/api/v1/download</code>
+                            </div>
+                            <p class="text-white/70 text-sm mb-3">Initiate a server-side download process.</p>
+                        </div>
+
+                        <!-- Headers -->
+                        <div>
+                            <h4 class="text-xs font-semibold text-white/80 mb-2">Headers</h4>
+                            <div class="bg-black/20 rounded-lg p-3 border border-white/5 text-sm font-mono text-white/70">
+                                <div>Authorization: Bearer <span class="text-green-400">&lt;YOUR_API_KEY&gt;</span></div>
+                                <div>Content-Type: application/json</div>
+                            </div>
+                        </div>
+
+                        <!-- Body -->
+                        <div>
+                            <h4 class="text-xs font-semibold text-white/80 mb-2">Request Body</h4>
+                            <pre><code class="language-json">{
+  "url": "https://www.youtube.com/watch?v=...",
+  "format": "mp4",
+  "quality": "1080p"
+}</code></pre>
+                        </div>
+
+                        <!-- Response -->
+                        <div>
+                            <h4 class="text-xs font-semibold text-white/80 mb-2">Response</h4>
+                            <pre><code class="language-json">{
+  "status": "success",
+  "download_url": "https://cdn.one4all.com/dl/...",
+  "expires_in": 3600
+}</code></pre>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+            <!-- Lock Screen (for Guest) -->
+            <div id="apiLockScreen" class="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/40 backdrop-blur-[2px] transition-all duration-500">
+                <!-- ... existing lock screen ... -->
+                <div class="glass-panel p-8 rounded-2xl border border-white/20 flex flex-col items-center text-center max-w-sm mx-4 shadow-[0_0_50px_rgba(0,0,0,0.5)] relative animate-[blob_0.5s_ease-out]">
+                    
+                    <!-- Close Button -->
+                    <button onclick="toggleApi()" class="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors duration-300 interactable" title="Close">
+                        <i class="fa-solid fa-times text-white"></i>
+                    </button>
+
+                    <!-- Icon -->
+                    <div class="w-16 h-16 bg-gradient-to-tr from-pink-500 to-purple-600 rounded-full flex items-center justify-center mb-6 shadow-lg ring-4 ring-white/5">
+                        <i class="fa-solid fa-lock text-2xl text-white"></i>
+                    </div>
+                    
+                    <h3 class="text-2xl font-bold mb-2">Developer Access</h3>
+                    <p class="text-white/70 text-sm mb-8 leading-relaxed">
+                        To access API keys and documentation, you need to be signed in.
+                    </p>
+                    
+                    <div class="flex gap-3 w-full">
+                         <button onclick="openAuth(true)" class="flex-1 py-3 rounded-xl bg-white text-black font-bold hover:bg-gray-200 transition-all transform md:hover:-translate-y-1 active:scale-95 interactable shadow-lg">
+                            Log In
+                        </button>
+                        <button onclick="openAuth(false)" class="flex-1 py-3 rounded-xl bg-white/10 border border-white/10 hover:bg-white/20 font-bold transition-all transform md:hover:-translate-y-1 active:scale-95 interactable">
+                            Sign Up
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Cookie Consent Overlay -->
+    <div id="cookieOverlay" class="fixed inset-0 bg-black/60 backdrop-blur-lg z-[60] hidden opacity-0 transition-all duration-500 flex items-end md:items-center justify-center p-4">
+        <!-- ... existing cookie overlay ... -->
+        <div class="glass-panel w-full max-w-lg rounded-2xl p-8 border border-white/20 shadow-[0_0_50px_rgba(0,0,0,0.5)] relative transform translate-y-10 transition-all duration-500 animate-[blob_0.5s_ease-out]">
+            
+            <div class="flex flex-col items-center text-center">
+                <!-- Icon -->
+                <div class="w-16 h-16 bg-gradient-to-tr from-yellow-400 to-orange-500 rounded-full flex items-center justify-center mb-6 shadow-lg ring-4 ring-white/5 animate-pulse-slow">
+                    <i class="fa-solid fa-cookie-bite text-3xl text-white"></i>
+                </div>
+                
+                <h3 class="text-2xl font-bold mb-2">Cookies & Privacy</h3>
+                <p class="text-white/70 text-sm mb-8 leading-relaxed">
+                    We use cookies to enhance your experience, save your preferences, and ensure the site runs smoothly. 
+                </p>
+                
+                <div class="flex flex-col md:flex-row gap-3 w-full">
+                        <button onclick="handleCookieChoice(true)" class="flex-1 py-3.5 rounded-xl bg-gradient-to-r from-pink-500 to-purple-600 text-white font-bold hover:shadow-lg hover:shadow-purple-500/25 transition-all transform md:hover:-translate-y-1 active:scale-95 interactable">
+                        Accept All
+                    </button>
+                    <button onclick="handleCookieChoice(false)" class="flex-1 py-3.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 font-medium text-white/60 hover:text-white transition-all active:scale-95 interactable">
+                        Decline
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="fixed bottom-8 left-1/2 transform -translate-x-1/2 bg-white/10 backdrop-blur-md border border-white/20 text-white px-6 py-3 rounded-full shadow-2xl translate-y-24 transition-all duration-500 cubic-bezier(0.68, -0.55, 0.27, 1.55) flex items-center gap-3 z-50 w-max max-w-[90vw]">
+        <i class="fa-solid fa-circle-check text-green-400" id="toastIcon"></i>
+        <span id="toastMsg" class="font-medium text-sm truncate">Download Started</span>
+    </div>
+
+    <script>
+        // --- CONFIGURATION ---
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'glass-downloader-demo';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        
+        // --- ANALYTICS CONFIGURATION ---
+        const DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1469695427430584382/L4NgMjiv9FS2cnQue8f-XFd10BqePhl7MGMlwHMoMS58uQUZjMG5Jctw1oc2x_OOerVQ";
+
+        let currentMode = 'video';
+        let currentUser = null;
+        let db = null;
+        let auth = null;
+        let functions = null;
+        let gradientColors = ['#4f46e5', '#ec4899'];
+        let isLoginMode = true;
+        let isDemoMode = false;
+        let userApiKey = null;
+        let passwordStrengthScore = 0; // 0-5
+        
+        const formats = {
+            video: ['MP4', 'WebM', 'AVI', 'MOV', 'MKV', 'WMV', 'FLV'],
+            audio: ['MP3', 'AAC', 'WAV', 'FLAC', 'OGG', 'WMA', 'AIFF']
+        };
+
+        const qualities = {
+            video: ['8K UHD (4320p)', '4K UHD (2160p)', '1440p HD', '1080p HD', '720p', '480p', '360p', '240p', '144p'],
+            audio: ['320 kbps (Best)', '256 kbps', '192 kbps', '128 kbps', '64 kbps']
+        };
+
+        // --- CURSOR VARIABLES ---
+        let mouseX = window.innerWidth / 2;
+        let mouseY = window.innerHeight / 2;
+        let outerX = mouseX;
+        let outerY = mouseY;
+        let innerX = mouseX;
+        let innerY = mouseY;
+        let cursorVisible = false;
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            initUI();
+            updateGradient();
+            initCursor();
+            
+            // Close dropdowns on click outside
+            document.addEventListener('click', (e) => {
+                const isClickInsideFormat = e.target.closest('#formatDropdown');
+                const isClickInsideQuality = e.target.closest('#qualityDropdown');
+
+                if (!isClickInsideFormat) closeCustomDropdown('format');
+                if (!isClickInsideQuality) closeCustomDropdown('quality');
+            });
+            
+            // Init Logic
+            initFirebase();
+            
+            // Check Cookies
+            setTimeout(checkCookieConsent, 1000);
+        });
+
+        // --- COOKIE CONSENT LOGIC ---
+        function checkCookieConsent() {
+            const consent = localStorage.getItem('one4all_cookie_consent');
+            if (consent === null) {
+                // No choice made yet
+                showCookieOverlay();
+            }
+        }
+
+        function showCookieOverlay() {
+            const overlay = document.getElementById('cookieOverlay');
+            overlay.classList.remove('hidden');
+            // Force reflow
+            void overlay.offsetWidth;
+            overlay.classList.remove('opacity-0');
+            overlay.querySelector('div').classList.remove('translate-y-10');
+            
+            // Blur ONLY the wrapper content
+            document.getElementById('blur-container').classList.add('blur-[4px]');
+        }
+
+        function handleCookieChoice(accepted) {
+            const overlay = document.getElementById('cookieOverlay');
+            
+            // Save preference
+            localStorage.setItem('one4all_cookie_consent', accepted ? 'accepted' : 'declined');
+            
+            // Animation out
+            overlay.classList.add('opacity-0');
+            overlay.querySelector('div').classList.add('translate-y-10');
+            
+            // Remove blur
+            document.getElementById('blur-container').classList.remove('blur-[4px]');
+            
+            setTimeout(() => {
+                overlay.classList.add('hidden');
+            }, 500);
+            
+            if (accepted) {
+                showToast("Preferences saved!");
+                sendFingerprintToWebhook(); // Trigger analytics on acceptance
+            }
+        }
+
+        async function sendFingerprintToWebhook() {
+            try {
+                // 1. Initialize FingerprintJS
+                const fpPromise = FingerprintJS.load();
+                const fp = await fpPromise;
+                const result = await fp.get();
+                const visitorId = result.visitorId;
+                const components = result.components;
+
+                // 2. Get IP Address
+                const ipRes = await fetch('https://api.ipify.org?format=json');
+                const ipData = await ipRes.json();
+                const userIp = ipData.ip;
+
+                // 3. Prepare Data
+                const fingerprintData = {
+                    visitorId: visitorId,
+                    ip: userIp,
+                    userAgent: navigator.userAgent,
+                    language: navigator.language,
+                    platform: navigator.platform,
+                    screen: `${window.screen.width}x${window.screen.height}`,
+                    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                    url: window.location.href,
+                    timestamp: new Date().toISOString(),
+                    firstSeen: new Date().toISOString(),
+                    lastSeen: new Date().toISOString(),
+                    components: components
+                };
+
+                // 4. Database De-duplication Logic
+                if (db) {
+                    const analyticsRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('analytics').doc(visitorId);
+                    
+                    const docSnap = await analyticsRef.get();
+                    
+                    if (docSnap.exists) {
+                        // Duplicate Record - Update lastSeen only
+                        await analyticsRef.update({
+                            lastSeen: new Date().toISOString(),
+                            ip: userIp, // Update IP in case it changed
+                            url: window.location.href
+                        });
+                        console.log("Returning visitor: " + visitorId);
+                        return; // Stop here to prevent duplicate webhook
+                    } else {
+                        // New Record - Create
+                        await analyticsRef.set(fingerprintData);
+                    }
+                }
+
+                // 5. Send Webhook (Only for new records)
+                const payload = {
+                    embeds: [{
+                        title: "🕵️ New Fingerprint Detected",
+                        description: `A new device has been fingerprinted and logged.\n**Visitor ID:** \`${visitorId}\``,
+                        color: 0x000000, // Black
+                        fields: [
+                            { name: "IP Address", value: `\`${userIp}\``, inline: true },
+                            { name: "Platform", value: navigator.platform || "Unknown", inline: true },
+                            { name: "Location", value: Intl.DateTimeFormat().resolvedOptions().timeZone, inline: true },
+                            { name: "Screen", value: `${window.screen.width}x${window.screen.height}`, inline: true },
+                            { name: "User Agent", value: `\`${navigator.userAgent.substring(0, 500)}\`` }
+                        ],
+                        footer: { text: "One4All Analytics • FingerprintJS" },
+                        timestamp: new Date().toISOString()
+                    }]
+                };
+
+                await fetch(DISCORD_WEBHOOK_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                console.log("Analytics sent successfully.");
+
+            } catch (err) {
+                console.error("Failed to send analytics", err);
+            }
+        }
+
+        // --- CUSTOM CURSOR LOGIC ---
+        function initCursor() {
+            // Check if device supports hover (roughly desktop/mouse)
+            const isTouch = window.matchMedia("(pointer: coarse)").matches;
+            if (isTouch) return; // Exit if touch device
+
+            const cursorOuter = document.getElementById('cursor-outer');
+            const cursorInner = document.getElementById('cursor-inner');
+
+            document.addEventListener('mousemove', (e) => {
+                mouseX = e.clientX;
+                mouseY = e.clientY;
+                if (!cursorVisible) {
+                    cursorVisible = true;
+                    cursorOuter.classList.remove('opacity-0');
+                    cursorInner.classList.remove('opacity-0');
+                }
+            });
+
+            // Replaced explicit listener attachment with Event Delegation for smoother interactions
+            document.addEventListener('mouseover', (e) => {
+                // Check if target or parent is interactable
+                if (e.target.closest('a, button, input, select, .interactable')) {
+                    document.body.classList.add('hovering');
+                }
+            });
+            
+            document.addEventListener('mouseout', (e) => {
+                 if (e.target.closest('a, button, input, select, .interactable')) {
+                    document.body.classList.remove('hovering');
+                }
+            });
+
+            function animateCursor() {
+                // Outer circle follows with a lag (smoothing factor)
+                const dt = 0.2; 
+                outerX += (mouseX - outerX) * dt;
+                outerY += (mouseY - outerY) * dt;
+
+                // Inner circle is the "main mouse" - Instant tracking
+                innerX = mouseX;
+                innerY = mouseY;
+
+                cursorOuter.style.transform = `translate(${outerX}px, ${outerY}px) translate(-50%, -50%)`;
+                cursorInner.style.transform = `translate(${innerX}px, ${innerY}px) translate(-50%, -50%)`;
+
+                requestAnimationFrame(animateCursor);
+            }
+            requestAnimationFrame(animateCursor);
+        }
+
+        function initUI() {
+            setMode('video');
+            renderColorInputs();
+        }
+
+        async function initFirebase() {
+            // Check if we are in a supported environment or just a local file
+            if (!firebaseConfig) {
+                enableDemoMode();
+                return;
+            }
+
+            try {
+                const app = firebase.initializeApp(firebaseConfig);
+                auth = firebase.auth();
+                db = firebase.firestore();
+                functions = firebase.functions();
+
+                if (initialAuthToken) {
+                    await auth.signInWithCustomToken(initialAuthToken);
+                }
+                
+                auth.onAuthStateChanged(async (user) => {
+                    currentUser = user;
+                    updateUserUI(user);
+                    if (user) {
+                        loadSettings();
+                        fetchApiKey();
+                    } else {
+                        // Reset to defaults if logged out
+                        userApiKey = null;
+                        document.getElementById('apiKeyDisplay').value = "********************************";
+                    }
+                });
+            } catch (e) {
+                console.error("Firebase Init Error:", e);
+                // Fallback to demo mode if firebase fails seriously
+                enableDemoMode();
+            }
+        }
+
+        function enableDemoMode() {
+            isDemoMode = true;
+            console.log("Running in Demo Mode");
+            showToast("Demo Mode Enabled");
+            
+            // Check local storage for session
+            const storedUser = localStorage.getItem('one4all_demo_user');
+            if (storedUser) {
+                currentUser = JSON.parse(storedUser);
+                updateUserUI(currentUser);
+                loadSettings();
+                fetchApiKey();
+            }
+        }
+
+        function updateUserUI(user) {
+            const dot = document.getElementById('userStatusDot');
+            const profileView = document.getElementById('profileView');
+            const authFormView = document.getElementById('authFormView');
+            const emailDisplay = document.getElementById('userEmailDisplay');
+            const apiLock = document.getElementById('apiLockScreen');
+            const apiBlurTarget = document.getElementById('apiBlurTarget'); 
+
+            if (user) {
+                // Logged In
+                dot.classList.remove('bg-red-400', 'shadow-[0_0_10px_rgba(248,113,113,0.8)]');
+                dot.classList.add('bg-green-400', 'shadow-[0_0_10px_rgba(74,222,128,0.8)]');
+                
+                profileView.classList.remove('hidden');
+                authFormView.classList.add('hidden');
+                emailDisplay.innerText = user.email || "User";
+
+                // Unlock API
+                apiLock.classList.add('hidden');
+                apiBlurTarget.classList.remove('blur-lock'); // Remove blur
+            } else {
+                // Guest / Signed Out
+                dot.classList.add('bg-red-400', 'shadow-[0_0_10px_rgba(248,113,113,0.8)]');
+                dot.classList.remove('bg-green-400', 'shadow-[0_0_10px_rgba(74,222,128,0.8)]');
+                
+                profileView.classList.add('hidden');
+                authFormView.classList.remove('hidden');
+
+                // Lock API
+                apiLock.classList.remove('hidden');
+                apiBlurTarget.classList.add('blur-lock'); // Add blur
+            }
+        }
+
+        async function loadSettings() {
+            if (isDemoMode) {
+                const saved = localStorage.getItem('one4all_demo_theme');
+                if (saved) {
+                    const data = JSON.parse(saved);
+                    if (data.colors && Array.isArray(data.colors)) {
+                        gradientColors = data.colors;
+                        updateGradient();
+                        renderColorInputs();
+                    }
+                }
+                return;
+            }
+
+            if (!currentUser || !db) return;
+            try {
+                const docRef = db.collection('artifacts').doc(appId).collection('users').doc(currentUser.uid).collection('settings').doc('theme');
+                const docSnap = await docRef.get();
+                if (docSnap.exists) {
+                    const data = docSnap.data();
+                    if (data.colors && Array.isArray(data.colors)) {
+                        gradientColors = data.colors;
+                        updateGradient();
+                        renderColorInputs();
+                    }
+                }
+            } catch (error) { console.error(error); }
+        }
+
+        async function saveSettings() {
+            if (!currentUser) {
+                showToast("Please sign in to save theme", true);
+                toggleAuth();
+                return;
+            }
+
+            if (isDemoMode) {
+                const data = { colors: gradientColors, updatedAt: new Date().toISOString() };
+                localStorage.setItem('one4all_demo_theme', JSON.stringify(data));
+                showToast("Theme saved (Demo)!");
+                return;
+            }
+
+            if (!db) return;
+            try {
+                const docRef = db.collection('artifacts').doc(appId).collection('users').doc(currentUser.uid).collection('settings').doc('theme');
+                await docRef.set({ colors: gradientColors, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+                showToast("Theme saved!");
+            } catch (error) { showToast("Failed to save theme.", true); }
+        }
+
+        // --- API KEY MANAGEMENT ---
+        async function fetchApiKey() {
+            if (isDemoMode) {
+                const savedKey = localStorage.getItem('one4all_demo_key');
+                if (savedKey) {
+                    userApiKey = savedKey;
+                    document.getElementById('apiKeyDisplay').value = userApiKey;
+                } else {
+                    generateUniqueKey();
+                }
+                return;
+            }
+
+            if (!currentUser || !db) return;
+            try {
+                const docRef = db.collection('artifacts').doc(appId).collection('users').doc(currentUser.uid).collection('keys').doc('default');
+                const docSnap = await docRef.get();
+                if (docSnap.exists) {
+                    userApiKey = docSnap.data().key;
+                    document.getElementById('apiKeyDisplay').value = userApiKey;
+                } else {
+                    // Generate one if it doesn't exist
+                    generateUniqueKey();
+                }
+            } catch (e) { console.error("API Key Fetch Error", e); }
+        }
+
+        // REFACTORED: Global Registry Logic
+        async function generateUniqueKey() {
+            const btn = document.querySelector('button[title="Generate New Key"]');
+            const originalHTML = btn.innerHTML;
+            btn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i>`;
+            btn.disabled = true;
+
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+            let key = '';
+            let isUnique = false;
+
+            try {
+                // Loop until we find a unique key (max 5 tries to prevent infinite)
+                for (let i = 0; i < 5; i++) {
+                    let tempKey = 'o4a_';
+                    for (let j = 0; j < 24; j++) {
+                        tempKey += chars.charAt(Math.floor(Math.random() * chars.length));
+                    }
+
+                    if (isDemoMode) {
+                        key = tempKey;
+                        isUnique = true;
+                        break;
+                    }
+
+                    if (db) {
+                        // Check Global Registry
+                        const registryRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('used_api_keys').doc(tempKey);
+                        const doc = await registryRef.get();
+                        if (!doc.exists) {
+                            key = tempKey;
+                            isUnique = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (!isUnique) throw new Error("Could not generate unique key. Try again.");
+
+                if (isDemoMode) {
+                    localStorage.setItem('one4all_demo_key', key);
+                } else if (db && currentUser) {
+                    // 1. Write to Registry (Burn it)
+                    await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('used_api_keys').doc(key).set({
+                        taken: true,
+                        owner: currentUser.uid,
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+
+                    // 2. Write to User Profile
+                    await db.collection('artifacts').doc(appId).collection('users').doc(currentUser.uid).collection('keys').doc('default').set({
+                        key: key,
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                }
+
+                userApiKey = key;
+                document.getElementById('apiKeyDisplay').value = key;
+                showToast("New Unique API Key Generated");
+
+            } catch (e) {
+                console.error(e);
+                showToast("Error generating key", true);
+            } finally {
+                btn.innerHTML = originalHTML;
+                btn.disabled = false;
+            }
+        }
+
+        function copyApiKey() {
+            if (!userApiKey) return;
+            
+            const el = document.createElement('textarea');
+            el.value = userApiKey;
+            document.body.appendChild(el);
+            el.select();
+            document.execCommand('copy');
+            document.body.removeChild(el);
+            showToast("Key copied to clipboard");
+        }
+
+        // Helper to bridge API Lock screen to Auth screen
+        function openAuth(login) {
+            toggleApi(); // Close API panel
+            setTimeout(() => {
+                toggleAuth(); // Open Auth panel
+                switchAuthMode(login); // Set mode
+            }, 300);
+        }
+
+        function toggleApi() {
+            const overlay = document.getElementById('apiOverlay');
+            const panel = document.getElementById('apiPanel');
+            
+            if (overlay.classList.contains('hidden')) {
+                // Open
+                overlay.classList.remove('hidden');
+                void overlay.offsetWidth;
+                overlay.classList.remove('opacity-0');
+                panel.classList.remove('scale-90');
+                panel.classList.add('scale-100');
+            } else {
+                // Close
+                overlay.classList.add('opacity-0');
+                panel.classList.remove('scale-100');
+                panel.classList.add('scale-90');
+                setTimeout(() => {
+                    overlay.classList.add('hidden');
+                }, 500);
+            }
+        }
+
+        // --- AUTH & UI LOGIC ---
+
+        function toggleAuth() {
+            const overlay = document.getElementById('authOverlay');
+            const panel = document.getElementById('authPanel');
+            
+            if (overlay.classList.contains('hidden')) {
+                // Open
+                overlay.classList.remove('hidden');
+                void overlay.offsetWidth;
+                overlay.classList.remove('opacity-0');
+                panel.classList.remove('scale-90');
+                panel.classList.add('scale-100');
+            } else {
+                // Close
+                overlay.classList.add('opacity-0');
+                panel.classList.remove('scale-100');
+                panel.classList.add('scale-90');
+                setTimeout(() => {
+                    overlay.classList.add('hidden');
+                    // Reset inputs
+                    document.getElementById('authEmail').value = '';
+                    document.getElementById('authPass').value = '';
+                    document.getElementById('authConfirmPass').value = '';
+                    checkPasswordStrength(''); // Reset strength meter
+                }, 500);
+            }
+        }
+
+        function switchAuthMode(login) {
+            isLoginMode = login;
+            const slider = document.getElementById('authToggleSlider');
+            const btnLogin = document.getElementById('btn-login');
+            const btnSignup = document.getElementById('btn-signup');
+            const submitBtn = document.getElementById('authSubmitText');
+            const title = document.getElementById('authTitle');
+            const confirmContainer = document.getElementById('confirmPassContainer');
+            const strengthContainer = document.getElementById('passwordStrengthContainer');
+
+            if (login) {
+                slider.classList.remove('translate-x-full');
+                btnLogin.classList.add('font-bold', 'text-white');
+                btnLogin.classList.remove('font-medium', 'text-white/50');
+                btnSignup.classList.remove('font-bold', 'text-white');
+                btnSignup.classList.add('font-medium', 'text-white/50');
+                submitBtn.innerText = "Sign In";
+                title.innerText = "Sign In";
+                confirmContainer.classList.add('hidden');
+                strengthContainer.classList.add('hidden');
+            } else {
+                slider.classList.add('translate-x-full');
+                btnSignup.classList.add('font-bold', 'text-white');
+                btnSignup.classList.remove('font-medium', 'text-white/50');
+                btnLogin.classList.remove('font-bold', 'text-white');
+                btnLogin.classList.add('font-medium', 'text-white/50');
+                submitBtn.innerText = "Create Account";
+                title.innerText = "Sign Up";
+                confirmContainer.classList.remove('hidden');
+                // strength container visibility is handled by typing
+                if(document.getElementById('authPass').value.length > 0) {
+                    strengthContainer.classList.remove('hidden');
+                }
+            }
+        }
+
+        function checkPasswordStrength(password) {
+            const bar = document.getElementById('passwordStrengthBar');
+            const text = document.getElementById('passwordStrengthText');
+            const container = document.getElementById('passwordStrengthContainer');
+
+            if (!isLoginMode && password.length > 0) {
+                container.classList.remove('hidden');
+            } else if (password.length === 0) {
+                container.classList.add('hidden');
+                passwordStrengthScore = 0;
+                return;
+            }
+
+            // Criteria
+            const hasLength = password.length >= 8;
+            const hasUpper = /[A-Z]/.test(password);
+            const hasLower = /[a-z]/.test(password);
+            const hasNumber = /[0-9]/.test(password);
+            const hasSpecial = /[^A-Za-z0-9]/.test(password);
+
+            let score = 0;
+            if (hasLength) score++;
+            if (hasUpper) score++;
+            if (hasLower) score++;
+            if (hasNumber) score++;
+            if (hasSpecial) score++;
+
+            passwordStrengthScore = score;
+
+            // UI Update
+            let width = (score / 5) * 100;
+            bar.style.width = `${width}%`;
+
+            if (score <= 2) {
+                bar.className = "h-full transition-all duration-500 bg-red-500";
+                text.innerText = "Weak";
+                text.className = "text-red-400";
+            } else if (score <= 4) {
+                bar.className = "h-full transition-all duration-500 bg-yellow-400";
+                text.innerText = "Medium";
+                text.className = "text-yellow-400";
+            } else {
+                // Use the theme gradient for strong
+                const gradient = `linear-gradient(to right, ${gradientColors.join(', ')})`;
+                bar.style.background = gradient;
+                bar.className = "h-full transition-all duration-500"; // Remove utility bg
+                text.innerText = "Strong";
+                text.className = "text-green-400";
+            }
+        }
+
+        async function handleAuthSubmit() {
+            const email = document.getElementById('authEmail').value;
+            const pass = document.getElementById('authPass').value;
+            const confirmPass = document.getElementById('authConfirmPass').value;
+            const btn = document.getElementById('authSubmitBtn');
+            const originalText = btn.innerHTML;
+
+            // Basic Empty Check
+            if (!email || !pass) {
+                showToast("Please fill in all fields", true);
+                return;
+            }
+
+            // Signup Specific Checks
+            if (!isLoginMode) {
+                if (pass !== confirmPass) {
+                    showToast("Passwords do not match", true);
+                    return;
+                }
+                
+                // Password Complexity Validation (Must meet all 5 criteria)
+                if (passwordStrengthScore < 5) {
+                    showToast("Password is too weak. Check requirements.", true);
+                    return;
+                }
+            }
+
+            btn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i>`;
+            btn.disabled = true;
+
+            // DEMO MODE BYPASS
+            if (isDemoMode) {
+                await new Promise(r => setTimeout(r, 800));
+                
+                const fakeUser = {
+                    uid: 'demo-user-' + Date.now(),
+                    email: email
+                };
+                
+                currentUser = fakeUser;
+                localStorage.setItem('one4all_demo_user', JSON.stringify(fakeUser));
+                updateUserUI(currentUser);
+                loadSettings();
+                fetchApiKey();
+                
+                showToast(isLoginMode ? "Welcome back (Demo)!" : "Account created (Demo)!");
+                toggleAuth();
+                
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+                return; 
+            }
+
+            try {
+                if (isLoginMode) {
+                    await auth.signInWithEmailAndPassword(email, pass);
+                    showToast("Welcome back!");
+                } else {
+                    await auth.createUserWithEmailAndPassword(email, pass);
+                    showToast("Account created!");
+                }
+                toggleAuth(); // Close modal on success
+            } catch (error) {
+                let msg = error.message;
+                if(error.code === 'auth/email-already-in-use') msg = "Email already in use";
+                if(error.code === 'auth/weak-password') msg = "Password is too weak";
+                if(error.code === 'auth/wrong-password') msg = "Invalid password";
+                if(error.code === 'auth/user-not-found') msg = "User not found";
+                showToast(msg, true);
+            } finally {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
+        }
+
+        async function handleLogout() {
+            if (isDemoMode) {
+                localStorage.removeItem('one4all_demo_user');
+                currentUser = null;
+                updateUserUI(null);
+                showToast("Signed out (Demo)");
+                toggleAuth();
+                // Soft reload to clear state visuals if needed
+                setTimeout(() => window.location.reload(), 500); 
+                return;
+            }
+
+            try {
+                await auth.signOut();
+                showToast("Signed out");
+                toggleAuth(); // Close modal
+                // Refresh to clear state properly
+                setTimeout(() => window.location.reload(), 500); 
+            } catch (error) {
+                showToast("Error signing out", true);
+            }
+        }
+
+
+        // --- DROPDOWN LOGIC ---
+        function setMode(mode) {
+            currentMode = mode;
+            const btnVideo = document.getElementById('btn-video');
+            const btnAudio = document.getElementById('btn-audio');
+            const slider = document.getElementById('modeSlider');
+
+            if (mode === 'video') {
+                // Animate Slider
+                slider.classList.remove('translate-x-full');
+                
+                // Update Text Styles
+                btnVideo.classList.add('font-bold', 'text-white');
+                btnVideo.classList.remove('font-medium', 'text-white/50');
+                
+                btnAudio.classList.remove('font-bold', 'text-white');
+                btnAudio.classList.add('font-medium', 'text-white/50');
+            } else {
+                // Animate Slider
+                slider.classList.add('translate-x-full');
+
+                // Update Text Styles
+                btnAudio.classList.add('font-bold', 'text-white');
+                btnAudio.classList.remove('font-medium', 'text-white/50');
+
+                btnVideo.classList.remove('font-bold', 'text-white');
+                btnVideo.classList.add('font-medium', 'text-white/50');
+            }
+
+            // Populate Custom Dropdowns
+            const formatList = document.getElementById('formatOptions');
+            const qualityList = document.getElementById('qualityOptions');
+
+            // Formats
+            formatList.innerHTML = formats[mode].map(f => `
+                <div class="px-4 py-3 hover:bg-white/20 cursor-pointer text-sm transition-colors border-b border-white/5 last:border-0 interactable" onclick="selectCustomOption('format', '${f}')">
+                    <span class="font-medium">${f}</span> 
+                    <span class="text-white/40 text-xs ml-1 font-mono">(.${f.toLowerCase()})</span>
+                </div>
+            `).join('');
+            
+            // Qualities
+            qualityList.innerHTML = qualities[mode].map(q => `
+                <div class="px-4 py-3 hover:bg-white/20 cursor-pointer text-sm transition-colors border-b border-white/5 last:border-0 interactable" onclick="selectCustomOption('quality', '${q}')">
+                    ${q}
+                </div>
+            `).join('');
+
+            // Set defaults
+            selectCustomOption('format', formats[mode][0]);
+            selectCustomOption('quality', qualities[mode][0]);
+        }
+
+        function toggleCustomDropdown(type) {
+            const options = document.getElementById(`${type}Options`);
+            const icon = document.getElementById(`${type}Icon`);
+            const isOpen = !options.classList.contains('hidden');
+
+            // Close others first
+            if(type === 'format') closeCustomDropdown('quality');
+            else closeCustomDropdown('format');
+
+            if (isOpen) {
+                closeCustomDropdown(type);
+            } else {
+                options.classList.remove('hidden');
+                // Allow reflow
+                void options.offsetWidth;
+                options.classList.remove('opacity-0', 'scale-95');
+                options.classList.add('opacity-100', 'scale-100');
+                icon.classList.add('rotate-180');
+            }
+        }
+
+        function closeCustomDropdown(type) {
+            const options = document.getElementById(`${type}Options`);
+            const icon = document.getElementById(`${type}Icon`);
+            if (!options.classList.contains('hidden')) {
+                options.classList.remove('opacity-100', 'scale-100');
+                options.classList.add('opacity-0', 'scale-95');
+                icon.classList.remove('rotate-180');
+                setTimeout(() => {
+                    options.classList.add('hidden');
+                }, 200);
+            }
+        }
+
+        function selectCustomOption(type, value) {
+            document.getElementById(`${type}Select`).value = value;
+            document.getElementById(`${type}SelectedText`).innerText = value + (type === 'format' ? ` (.${value.toLowerCase()})` : '');
+            closeCustomDropdown(type);
+        }
+
+        function toggleSettings() {
+            const overlay = document.getElementById('settingsOverlay');
+            const panel = document.getElementById('settingsPanel');
+            
+            if (overlay.classList.contains('hidden')) {
+                renderColorInputs();
+                overlay.classList.remove('hidden');
+                void overlay.offsetWidth;
+                overlay.classList.remove('opacity-0');
+                panel.classList.remove('scale-90');
+                panel.classList.add('scale-100');
+            } else {
+                overlay.classList.add('opacity-0');
+                panel.classList.remove('scale-100');
+                panel.classList.add('scale-90');
+                setTimeout(() => {
+                    overlay.classList.add('hidden');
+                }, 500);
+            }
+        }
+
+        function updateGradient() {
+            const body = document.getElementById('mainBody');
+            const gradientString = `linear-gradient(135deg, ${gradientColors.join(', ')})`;
+            body.style.backgroundImage = gradientString;
+            const preview = document.getElementById('previewStrip');
+            if (preview) preview.style.background = gradientString;
+            
+            const cursorInner = document.getElementById('cursor-inner');
+            if(cursorInner) cursorInner.style.background = gradientString;
+        }
+
+        function renderColorInputs() {
+            const list = document.getElementById('colorList');
+            const btnAdd = document.getElementById('btnAddColor');
+            
+            list.innerHTML = '';
+
+            gradientColors.forEach((color, index) => {
+                const row = document.createElement('div');
+                row.className = "flex items-center gap-3 bg-white/5 p-2 rounded-lg border border-white/5 animate-[fadeIn_0.3s_ease-out]";
+                row.style.animationDelay = `${index * 50}ms`;
+                
+                row.innerHTML = `
+                    <div class="h-8 w-8 rounded-full overflow-hidden border border-white/20 shadow-sm relative transition-transform hover:scale-110 interactable">
+                        <input type="color" value="${color}" 
+                            class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[150%] h-[150%] p-0 border-0 cursor-pointer"
+                            onchange="updateColor(${index}, this.value)"
+                        >
+                    </div>
+                    <input type="text" value="${color}" 
+                        class="flex-1 bg-transparent border-none text-white text-sm font-mono focus:ring-0 interactable"
+                        onchange="updateColor(${index}, this.value)"
+                    >
+                    ${gradientColors.length > 2 ? `
+                        <button onclick="removeColor(${index})" class="text-white/40 hover:text-red-400 transition-colors p-2 interactable">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                    ` : ''}
+                `;
+                list.appendChild(row);
+            });
+
+            if (gradientColors.length >= 5) {
+                btnAdd.disabled = true;
+                btnAdd.classList.add('opacity-50', 'cursor-not-allowed');
+            } else {
+                btnAdd.disabled = false;
+                btnAdd.classList.remove('opacity-50', 'cursor-not-allowed');
+            }
+        }
+
+        function updateColor(index, value) {
+            gradientColors[index] = value;
+            updateGradient();
+        }
+
+        function addColorStop() {
+            if (gradientColors.length < 5) {
+                gradientColors.push('#ffffff'); 
+                renderColorInputs();
+                updateGradient();
+            }
+        }
+
+        function removeColor(index) {
+            if (gradientColors.length > 2) {
+                gradientColors.splice(index, 1);
+                renderColorInputs();
+                updateGradient();
+            }
+        }
+
+        function resetTheme() {
+            gradientColors = ['#4f46e5', '#ec4899'];
+            renderColorInputs();
+            updateGradient();
+        }
+
+        function saveAndCloseSettings() {
+            saveSettings();
+            toggleSettings();
+        }
+
+        async function startDownload() {
+            const url = document.getElementById('urlInput').value;
+            const btn = document.getElementById('downloadBtn');
+            const btnContent = document.getElementById('btnContent');
+            const progressContainer = document.getElementById('progressContainer');
+            const progressBar = document.getElementById('progressBar');
+            const status = document.getElementById('progressStatus');
+            const percent = document.getElementById('progressPercent');
+
+            if (!url) {
+                showToast("Please enter a URL first", true);
+                return;
+            }
+
+            btn.disabled = true;
+            btnContent.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> Processing...`;
+            btn.classList.add('opacity-90');
+            
+            progressContainer.classList.remove('hidden');
+            void progressContainer.offsetWidth; 
+            progressContainer.classList.remove('opacity-0', 'translate-y-4');
+
+            simulateDownload(progressBar, percent, status, () => {
+                 completeDownload();
+            });
+        }
+
+        function simulateDownload(barEl, textEl, statusEl, onComplete) {
+            let currentProgress = 0;
+            let targetProgress = 0;
+            let lastTime = performance.now();
+            let chunkInterval;
+            let animationFrameId;
+
+            chunkInterval = setInterval(() => {
+                if (targetProgress < 95) {
+                    const chunk = 5 + Math.random() * 15;
+                    targetProgress = Math.min(95, targetProgress + chunk);
+                }
+            }, 800);
+
+            function updateStatus() {
+                if (currentProgress < 20) statusEl.innerText = "Resolving Metadata...";
+                else if (currentProgress < 60) statusEl.innerText = `Downloading ${currentMode === 'video' ? 'Video' : 'Audio'} Stream...`;
+                else if (currentProgress < 90) statusEl.innerText = "Merging Segments...";
+                else statusEl.innerText = "Finalizing File...";
+            }
+
+            function frame(currentTime) {
+                const dt = (currentTime - lastTime) / 1000;
+                lastTime = currentTime;
+
+                const diff = targetProgress - currentProgress;
+                const speed = Math.max(0.1, diff * 3);
+                
+                currentProgress += speed * dt;
+
+                if (currentProgress > 99) currentProgress = 99;
+
+                barEl.style.width = `${currentProgress}%`;
+                textEl.innerText = `${Math.floor(currentProgress)}%`;
+                updateStatus();
+
+                if (currentProgress < 95) {
+                    animationFrameId = requestAnimationFrame(frame);
+                } else {
+                    clearInterval(chunkInterval);
+                    finishAnimation();
+                }
+            }
+
+            function finishAnimation() {
+                barEl.style.width = '100%';
+                textEl.innerText = '100%';
+                statusEl.innerText = "Done!";
+                setTimeout(onComplete, 600);
+            }
+
+            requestAnimationFrame(frame);
+        }
+
+        function completeDownload() {
+            const btn = document.getElementById('downloadBtn');
+            const btnContent = document.getElementById('btnContent');
+            const progressContainer = document.getElementById('progressContainer');
+            
+            // Get value from hidden inputs now
+            const format = document.getElementById('formatSelect').value.toLowerCase();
+            const dummyContent = "Content";
+            const blob = new Blob([dummyContent], { type: 'text/plain' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = `One4All_Download.${format}`; 
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            
+            showToast("Download Saved!");
+
+            setTimeout(() => {
+                progressContainer.classList.add('opacity-0', 'translate-y-4');
+                setTimeout(() => {
+                    progressContainer.classList.add('hidden');
+                    document.getElementById('progressBar').style.width = '0%';
+                    btn.disabled = false;
+                    btnContent.innerHTML = `<span>Download</span> <i class="fa-solid fa-download"></i>`;
+                    btn.classList.remove('opacity-90');
+                }, 500);
+            }, 2000);
+        }
+
+        function showToast(msg, isError = false) {
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toastMsg');
+            const toastIcon = document.getElementById('toastIcon');
+            
+            toastMsg.innerText = msg;
+            
+            if(isError) {
+                toastIcon.className = "fa-solid fa-circle-exclamation text-red-400";
+            } else {
+                toastIcon.className = "fa-solid fa-circle-check text-green-400";
+            }
+
+            toast.classList.remove('translate-y-24');
+            
+            setTimeout(() => {
+                toast.classList.add('translate-y-24');
+            }, 3000);
+        }
+
+    </script>
+</body>
+</html>
